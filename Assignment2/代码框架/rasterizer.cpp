@@ -239,23 +239,36 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     // iterate through the pixel and find if the current pixel is inside the triangle
     auto[left, right, top, bottom] = GetBoundBox(v);
     std::cout << "Box = " << left << ", " << right << ", " <<  top << ", " <<  bottom << std::endl;
-    for (int i = left; i <= right; ++i) {
-      for (int j = bottom; j <= top; ++j) {
-        float x = i + 0.5;
-        float y = j + 0.5;
-        // If so, use the following code to get the interpolated z value.
-        auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
-        float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-        float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-        z_interpolated *= w_reciprocal;
 
-        // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
-
-        if (insideTriangle(i, j, t.v)){
-          set_pixel({x, y, z_interpolated}, t.getColor());
+    bool use_algo_msaa = false;
+    for (int x = left; x <= right; ++x) {
+      for (int y = bottom; y <= top; ++y) {
+        if (!use_algo_msaa) {
+          NormalAlgorithm(x, y, t, v);
         }
       }
     }
+}
+
+void rst::rasterizer::NormalAlgorithm(int x, int y, const Triangle & t, std::array<Eigen::Vector4f, 3Ui64> &v)
+{
+  float x_center = x + 0.5;
+  float y_center = y + 0.5;
+  // If so, use the following code to get the interpolated z value.
+  auto[alpha, beta, gamma] = computeBarycentric2D(x_center, y_center, t.v);
+  float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+  float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+  z_interpolated *= w_reciprocal;
+
+  const int offset = get_index(x, y);
+  // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
+
+  if (insideTriangle(x, y, t.v) && depth_buf[offset] > z_interpolated){
+    depth_buf[offset] = z_interpolated;
+    Eigen::Vector3f point ;
+    point << x, y, z_interpolated;
+    set_pixel(point, t.getColor());
+  }
 }
 
 void rst::rasterizer::set_model(const Eigen::Matrix4f& m)

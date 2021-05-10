@@ -79,6 +79,9 @@ namespace rst
 
         void rasterize_triangle(const Triangle& t);
 
+        void NormalAlgorithm(int x, int y, const Triangle& t,
+                             std::array<Eigen::Vector4f, 3Ui64>& v);
+
         void rasterize_wireframe(const Triangle& t);
 
         // VERTEX SHADER -> MVP -> Clipping -> /.W -> VIEWPORT -> DRAWLINE/DRAWTRI -> FRAGSHADER
