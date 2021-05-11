@@ -79,6 +79,9 @@ namespace rst
 
         void rasterize_triangle(const Triangle& t);
 
+        void MSAAAlgorithm(int x, int y, const Triangle& t,
+                           std::array<Eigen::Vector4f, 3Ui64>& v);
+
         void NormalAlgorithm(int x, int y, const Triangle& t,
                              std::array<Eigen::Vector4f, 3Ui64>& v);
 

@@ -156,10 +156,10 @@ static std::tuple<float, float, float> computeBarycentric2D(float x, float y, co
     return {c1,c2,c3};
 }
 
-static bool insideTriangle(int x, int y, const Vector3f* _v)
+static bool insideTriangle(float x, float y, const Vector3f* _v)
 {   
     // TODO : Implement this function to check if the point (x, y) is inside the triangle represented by _v[0], _v[1], _v[2]
-  auto[alpha, beta, gamma] = computeBarycentric2D(x + 0.5f, y + 0.5f, _v);
+  auto[alpha, beta, gamma] = computeBarycentric2D(x, y, _v);
   return alpha > 0 && beta > 0 && gamma > 0;
 }
 
@@ -210,7 +210,7 @@ void rst::rasterizer::draw(pos_buf_id pos_buffer, ind_buf_id ind_buffer, col_buf
         t.setColor(2, col_z[0], col_z[1], col_z[2]);
 
         rasterize_triangle(t);
-        rasterize_wireframe(t);
+        //rasterize_wireframe(t);
     }
 }
 
@@ -240,14 +240,48 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     auto[left, right, top, bottom] = GetBoundBox(v);
     std::cout << "Box = " << left << ", " << right << ", " <<  top << ", " <<  bottom << std::endl;
 
-    bool use_algo_msaa = false;
+    bool use_algo_msaa = true;
     for (int x = left; x <= right; ++x) {
       for (int y = bottom; y <= top; ++y) {
-        if (!use_algo_msaa) {
+        if (use_algo_msaa) {
+          MSAAAlgorithm(x, y, t, v);
+        } else {
           NormalAlgorithm(x, y, t, v);
         }
       }
     }
+}
+
+void rst::rasterizer::MSAAAlgorithm(int x, int y, const Triangle & t, std::array<Eigen::Vector4f, 3Ui64> &v)
+{
+  std::vector<Eigen::Vector2f> offsets {{0.25, 0.25},
+  {0.25, 0.75},
+  {0.75, 0.25},
+  {0.75, 0.75}};
+
+  float min_z = std::numeric_limits<float>::max();
+  int in_count = 0;
+  for (int i = 0; i < offsets.size(); ++i) {
+    auto[alpha, beta, gamma] = computeBarycentric2D(x + offsets[i].x(), y + offsets[i].y(), t.v);
+      // Check insideTriangle 
+    if (alpha > 0 && beta > 0 && gamma > 0) {
+      float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+      float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+      z_interpolated *= w_reciprocal;
+
+      min_z = std::min(min_z, z_interpolated);
+      ++in_count;
+    }
+  }
+
+  const int offset = get_index(x, y);
+  if (in_count > 0 && min_z < depth_buf[offset]) {
+    depth_buf[offset] = min_z;
+    Eigen::Vector3f point ;
+    point << x, y, min_z;
+    float color_rate = (in_count / 4.0f);
+    set_pixel(point, t.getColor() * color_rate);
+  }
 }
 
 void rst::rasterizer::NormalAlgorithm(int x, int y, const Triangle & t, std::array<Eigen::Vector4f, 3Ui64> &v)
@@ -263,7 +297,7 @@ void rst::rasterizer::NormalAlgorithm(int x, int y, const Triangle & t, std::arr
   const int offset = get_index(x, y);
   // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
 
-  if (insideTriangle(x, y, t.v) && depth_buf[offset] > z_interpolated){
+  if (alpha > 0 && beta > 0 && gamma > 0 && depth_buf[offset] > z_interpolated){
     depth_buf[offset] = z_interpolated;
     Eigen::Vector3f point ;
     point << x, y, z_interpolated;
