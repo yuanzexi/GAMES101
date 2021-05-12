@@ -288,7 +288,11 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
       if (alpha > 0 && beta > 0 && gamma > 0 && depth_buf[offset] > z_interpolated){
         depth_buf[offset] = z_interpolated;
         Eigen::Vector2i point{x, y};
-        set_pixel(point, t.color[0]);
+        // set_pixel(point, t.color[0]);
+
+        fragment_shader_payload payload(t.color[0], t.normal[0].normalized(), t.tex_coords[0], nullptr);
+        auto pixel_color = fragment_shader(payload);
+        set_pixel(point, pixel_color);
       }
     }
   }
